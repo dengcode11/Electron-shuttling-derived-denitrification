@@ -1,0 +1,103 @@
+#Quality control
+conda activate fastp
+fastp -i path/to/Rawreads_1.fq.gz -I path/to/Rawreads_2.fq.gz \
+-o path/to/CleanReads_1.fq -O path/to/CleanReads_2.fq
+
+#Assembly
+conda activate megahit
+megahit -1 path/to/Rawreads_1.fq -2 path/to/Rawreads_2.fq \ 
+-o path/to/Assembly --min-contig-len 2500 -t 20
+
+#bowtie2
+conda activate bowtie2
+cd path/to/Assembly
+#biuld index
+ bowtie2-build final.contigs.fa genome
+#Mapping
+nohup bowtie2 -x genome -1 path/to/CleanReads_1.fq -2 path/to/CleanReads_2.fq \ 
+-S path/to/sample.sam -p 20
+
+
+#samtools
+conda activate samtools
+samtools view -@ 100 -bS path/to/sample.sam > path/to/sample.bam
+samtools sort path/to/sample.bam -o path/to/sample.sorted -@ 100
+
+
+#Metabat2
+conda activate metabat2
+jgi_summarize_bam_contig_depths --outputDepth depth.txt path/to/sample.sorted
+metabat2 -i path/to/final.contigs.fasta -a depth.txt -o bins/SampleName
+
+#cp
+cp -frap path/to/bins/*.fa  path/to/ALLMAGs
+
+#dRep
+conda activate dRep
+dRep dereplicate drep -g path/to/ALLMAG/*.fa -comp 50 -con 10
+
+#CheckM
+conda activate checkm
+checkm lineage_wf --tab_table -x fa path/to/drep/dereplicated_genomes \
+checkm_out -t 100 -f checkm -a AAI
+
+#GTDBtk
+conda activate gtdbtk
+gtdbtk classify_wf --genome_dir path/to/drep/dereplicated_genomes  \
+--out_dir path/to/tax_out --extension fa --cpu 20
+
+#coverM
+conda activate coverm
+coverm genome --coupled path/to/CleanReads_1.fq path/to/CleanReads_2.fq \
+--genome-fasta-directory path/to/drep/dereplicated_genomes -o SampleName.tsv --threads 20
+
+#METABOLIC
+conda activate METABOLIC
+cd path/to/METABOLIC
+perl METABOLIC-G.pl -in-gn path/to/drep/dereplicated_genomes -p single -o path/to/Function
+
+#Prodigal
+prodigal -i path/to/final.contigs.fa -a path/to/final.contigs.faa -d M_path/to/final.contigs.fna -p meta
+
+#hmmsearch
+hmmsearch Gene.hmm path/to/final.contigs.faa > Gene.out
+
+#extract.py
+from Bio import SeqIO
+result= open('Gene.fa', 'w')
+a={}
+f=open('ID.txt', 'r')
+for line in f:
+    a[line.strip()]=1
+f.close()
+for seq_record in SeqIO.parse('final.contigs.fna', 'fasta'):
+    if str(seq_record.id) in a:
+        result.write('>'+str(seq_record.description)+'\n')
+        result.write(str(seq_record.seq)+'\n')
+result.close()
+print('ok')
+
+#python
+python extract.py
+
+#bowtie2
+bowtie2-build path/to/Gene.fa gene
+bowtie2 -x genome -1 path/to/CleanReads_1.fq -2 path/to/CleanReads_2.fq \ 
+-S path/to/sample.sam -p 20
+
+#bbmap
+conda activate bbmap
+pileup.sh in=path/to/sample.sam rpkm=path/to/sample.txt
+
+#Phylogenetic Tree Analysis
+
+#Muscle
+muscle -align path/to/nosZGene.fa -output path/to/nosZ_align.fa
+
+#trimal
+cd path/to/trimal
+
+source/trimal -in path/to/nosZ_align.fa -out path/to/nosZtimal.fa -gt 0.95 -cons 50
+
+#iqtree
+iqtree -s nosZtimal.fa -m MFP -bb 1000 -nt 20

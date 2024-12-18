@@ -1,0 +1,39 @@
+#qiime
+
+qiime tools import \
+--type 'SampleData[SequencesWithQuality]' \
+--input-path manifest.txt \
+--output-path ../single-end-demux.qza \
+--input-format SingleEndFastqManifestPhred33V2
+
+
+qiime dada2 denoise-paired \
+--i-demultiplexed-seqs paired-end-demux.qza \--o-table table.qza \
+--o-representative-sequences rep-seqs.qza \
+--o-denoising-stats stats.qza \
+--p-trim-left-f 0 \
+--p-trim-left-r 0 \
+--p-trunc-len-f 0 \
+--p-trunc-len-r 0 \
+--p-n-threads 100
+
+
+qiime tools export \
+--input-path table.qza \
+--output-path output/out_raw
+
+
+biom convert -i output/out_raw/feature-table.biom \
+-o output/out_raw/16s.tsv --to-tsv
+
+
+
+qiime feature-classifier classify-sklearn \
+--i-reads rep-seqs-dn.qza \
+--i-classifier silva-138-99-nb-classifier.qza \
+--o-classification taxonomy.qza
+
+
+qiime tools export \
+--input-path taxonomy.qza \
+--output-path export_data
