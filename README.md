@@ -13,8 +13,11 @@ R-studio (v2023.09.0+463)   (https://posit.co/products/open-source/rstudio/) # I
 
 ### Required packages
 MASS     (v7.3-56) 
+
 lmtest   (v0.9-40)
+
 car      (v3.1-3)
+
 ggplot2  (v3.5.1)
 
 ### Usage
