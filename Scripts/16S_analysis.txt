@@ -1,0 +1,59 @@
+#qiime
+
+# Import the sequence data with quality information from a manifest file
+# and save the result as a QIIME artifact (QZA) file.
+# The data type is specified as 'SampleData[SequencesWithQuality]'.
+# The input manifest file is 'manifest.txt', and the output QZA file will be saved in the parent directory as 'single-end-demux.qza'.
+# The input format is set to 'SingleEndFastqManifestPhred33V2'.
+qiime tools import \
+--type 'SampleData[SequencesWithQuality]' \
+--input-path manifest.txt \
+--output-path ../single-end-demux.qza \
+--input-format SingleEndFastqManifestPhred33V2
+
+
+
+# Perform paired-end sequence denoising using the DADA2 algorithm.
+qiime dada2 denoise-paired \
+--i-demultiplexed-seqs paired-end-demux.qza \--o-table table.qza \    # Input is the demultiplexed paired-end sequences in the 'paired-end-demux.qza' file.
+# Outputs include an OTU table ('table.qza'), representative sequences ('rep-seqs.qza'),and denoising statistics ('stats.qza').
+--o-representative-sequences rep-seqs.qza \
+--o-denoising-stats stats.qza \    
+--p-trim-left-f 0 \   # The parameters for trimming the left ends of forward and reverse reads are set to 0.
+--p-trim-left-r 0 \   
+--p-trunc-len-f 0 \   # The parameters for truncating the lengths of forward and reverse reads are set to 0.
+--p-trunc-len-r 0 \   
+--p-n-threads 100     # The number of threads used for computation is set to 100.
+
+
+
+# Export the QIIME artifact file 'table.qza' to a directory.
+qiime tools export \
+--input-path table.qza \
+--output-path output/out_raw    # The output directory is 'output/out_raw'.
+
+
+
+# Convert the BIOM format feature table in the 'output/out_raw/feature-table.biom' file
+# to a tab-separated values (TSV) file named 'output/out_raw/16s.tsv'.
+biom convert -i output/out_raw/feature-table.biom \
+-o output/out_raw/16s.tsv --to-tsv
+
+
+
+# Perform taxonomic classification on the representative sequences.
+# Input is the representative sequences in the 'rep-seqs-dn.qza' file.
+# The classifier used is the 'silva-138-99-nb-classifier.qza'.
+# The output is the taxonomic classification results in the 'taxonomy.qza' file.
+qiime feature-classifier classify-sklearn \
+--i-reads rep-seqs-dn.qza \
+--i-classifier silva-138-99-nb-classifier.qza \
+--o-classification taxonomy.qza
+
+
+
+# Export the QIIME artifact file 'taxonomy.qza' to a directory.
+# The output directory is 'export_data'.
+qiime tools export \
+--input-path taxonomy.qza \
+--output-path export_data
